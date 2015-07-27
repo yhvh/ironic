@@ -16,14 +16,17 @@ from ironic.objects import chassis
 from ironic.objects import conductor
 from ironic.objects import node
 from ironic.objects import port
+from ironic.objects import portgroup
 
 
 Chassis = chassis.Chassis
 Conductor = conductor.Conductor
 Node = node.Node
 Port = port.Port
+Portgroup = portgroup.Portgroup
 
 __all__ = (Chassis,
            Conductor,
            Node,
-           Port)
+           Port,
+           Portgroup)

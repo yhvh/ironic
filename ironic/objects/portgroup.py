@@ -25,83 +25,76 @@ from ironic.objects import fields as object_fields
 
 
 @base.IronicObjectRegistry.register
-class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
+class Portgroup(base.IronicObject, object_base.VersionedObjectDictCompat):
     # Version 1.0: Initial version
-    # Version 1.1: Add get() and get_by_id() and get_by_address() and
-    #              make get_by_uuid() only work with a uuid
-    # Version 1.2: Add create() and destroy()
-    # Version 1.3: Add list()
-    # Version 1.4: Add list_by_node_id()
-    # Version 1.5: Add list_by_portgroup_id() and new fields
-    #              local_link_connection, portgroup_id and pxe_enabled
-    VERSION = '1.5'
+    VERSION = '1.0'
 
     dbapi = dbapi.get_instance()
 
     fields = {
         'id': object_fields.IntegerField(),
-        'uuid': object_fields.UUIDField(nullable=True),
+        'uuid': object_fields.UUIDField(),
+        'name': object_fields.StringField(nullable=True),
         'node_id': object_fields.IntegerField(nullable=True),
-        'address': object_fields.MACAddressField(nullable=True),
+        'address': object_fields.MACAddressField(),
         'extra': object_fields.FlexibleDictField(nullable=True),
-        'local_link_connection': object_fields.FlexibleDictField(
-            nullable=True),
-        'portgroup_id': object_fields.IntegerField(nullable=True),
-        'pxe_enabled': object_fields.BooleanField()
     }
 
     @staticmethod
-    def _from_db_object(port, db_port):
+    def _from_db_object(portgroup, db_portgroup):
         """Converts a database entity to a formal object."""
-        for field in port.fields:
-            port[field] = db_port[field]
+        for field in portgroup.fields:
+            portgroup[field] = db_portgroup[field]
 
-        port.obj_reset_changes()
-        return port
+        portgroup.obj_reset_changes()
+        return portgroup
 
     @staticmethod
     def _from_db_object_list(db_objects, cls, context):
         """Converts a list of database entities to a list of formal objects."""
-        return [Port._from_db_object(cls(context), obj) for obj in db_objects]
+        return [Portgroup._from_db_object(cls(context), obj) for obj in
+                db_objects]
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
     # Implications of calling new remote procedures should be thought through.
     # @object_base.remotable_classmethod
     @classmethod
-    def get(cls, context, port_id):
-        """Find a port based on its id or uuid and return a Port object.
+    def get(cls, context, portgroup_id):
+        """Find a portgroup based on its id or uuid and return a Portgroup object.
 
-        :param port_id: the id *or* uuid of a port.
-        :returns: a :class:`Port` object.
+        :param portgroup id: the id *or* uuid of a portgroup.
+        :returns: a :class:`Portgroup` object.
         :raises: InvalidIdentity
 
         """
-        if strutils.is_int_like(port_id):
-            return cls.get_by_id(context, port_id)
-        elif uuidutils.is_uuid_like(port_id):
-            return cls.get_by_uuid(context, port_id)
-        elif utils.is_valid_mac(port_id):
-            return cls.get_by_address(context, port_id)
+        if strutils.is_int_like(portgroup_id):
+            return cls.get_by_id(context, portgroup_id)
+        elif uuidutils.is_uuid_like(portgroup_id):
+            return cls.get_by_uuid(context, portgroup_id)
+        elif utils.is_valid_mac(portgroup_id):
+            return cls.get_by_address(context, portgroup_id)
+        elif utils.is_valid_logical_name(portgroup_id):
+            return cls.get_by_name(context, portgroup_id)
         else:
-            raise exception.InvalidIdentity(identity=port_id)
+            raise exception.InvalidIdentity(identity=portgroup_id)
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
     # Implications of calling new remote procedures should be thought through.
     # @object_base.remotable_classmethod
     @classmethod
-    def get_by_id(cls, context, port_id):
-        """Find a port based on its integer id and return a Port object.
+    def get_by_id(cls, context, portgroup_id):
+        """Find a portgroup based on its integer id and return a Portgroup object.
 
-        :param port_id: the id of a port.
-        :returns: a :class:`Port` object.
-        :raises: PortNotFound
+        :param portgroup id: the id of a portgroup.
+        :returns: a :class:`Portgroup` object.
+        :raises: PortgroupNotFound
 
         """
-        db_port = cls.dbapi.get_port_by_id(port_id)
-        port = Port._from_db_object(cls(context), db_port)
-        return port
+        db_portgroup = cls.dbapi.get_portgroup_by_id(portgroup_id)
+        portgroup = Portgroup._from_db_object(cls(context), db_portgroup)
+        return portgroup
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
@@ -109,17 +102,17 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
     # @object_base.remotable_classmethod
     @classmethod
     def get_by_uuid(cls, context, uuid):
-        """Find a port based on uuid and return a :class:`Port` object.
+        """Find a portgroup based on uuid and return a :class:`Portgroup` object.
 
-        :param uuid: the uuid of a port.
+        :param uuid: the uuid of a portgroup.
         :param context: Security context
-        :returns: a :class:`Port` object.
-        :raises: PortNotFound
+        :returns: a :class:`Portgroup` object.
+        :raises: PortgroupNotFound
 
         """
-        db_port = cls.dbapi.get_port_by_uuid(uuid)
-        port = Port._from_db_object(cls(context), db_port)
-        return port
+        db_portgroup = cls.dbapi.get_portgroup_by_uuid(uuid)
+        portgroup = Portgroup._from_db_object(cls(context), db_portgroup)
+        return portgroup
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
@@ -127,17 +120,35 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
     # @object_base.remotable_classmethod
     @classmethod
     def get_by_address(cls, context, address):
-        """Find a port based on address and return a :class:`Port` object.
+        """Find a portgroup based on address and return a :class:`Portgroup` object.
 
-        :param address: the address of a port.
+        :param address: the address of a portgroup.
         :param context: Security context
-        :returns: a :class:`Port` object.
-        :raises: PortNotFound
+        :returns: a :class:`Portgroup` object.
+        :raises: PortgroupNotFound
 
         """
-        db_port = cls.dbapi.get_port_by_address(address)
-        port = Port._from_db_object(cls(context), db_port)
-        return port
+        db_portgroup = cls.dbapi.get_portgroup_by_address(address)
+        portgroup = Portgroup._from_db_object(cls(context), db_portgroup)
+        return portgroup
+
+    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
+    # methods can be used in the future to replace current explicit RPC calls.
+    # Implications of calling new remote procedures should be thought through.
+    # @object_base.remotable_classmethod
+    @classmethod
+    def get_by_name(cls, context, name):
+        """Find a portgroup based on name and return a :class:`Portgroup` object.
+
+        :param name: the name of a portgroup.
+        :param context: Security context
+        :returns: a :class:`Portgroup` object.
+        :raises: PortgroupNotFound
+
+        """
+        db_portgroup = cls.dbapi.get_portgroup_by_name(name)
+        portgroup = Portgroup._from_db_object(cls(context), db_portgroup)
+        return portgroup
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
@@ -146,22 +157,22 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
     @classmethod
     def list(cls, context, limit=None, marker=None,
              sort_key=None, sort_dir=None):
-        """Return a list of Port objects.
+        """Return a list of Portgroup objects.
 
         :param context: Security context.
         :param limit: maximum number of resources to return in a single result.
         :param marker: pagination marker for large data sets.
         :param sort_key: column to sort results by.
         :param sort_dir: direction to sort. "asc" or "desc".
-        :returns: a list of :class:`Port` object.
+        :returns: a list of :class:`Portgroup` object.
         :raises: InvalidParameterValue
 
         """
-        db_ports = cls.dbapi.get_port_list(limit=limit,
-                                           marker=marker,
-                                           sort_key=sort_key,
-                                           sort_dir=sort_dir)
-        return Port._from_db_object_list(db_ports, cls, context)
+        db_portgroups = cls.dbapi.get_portgroup_list(limit=limit,
+                                                     marker=marker,
+                                                     sort_key=sort_key,
+                                                     sort_dir=sort_dir)
+        return Portgroup._from_db_object_list(db_portgroups, cls, context)
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
@@ -170,7 +181,7 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
     @classmethod
     def list_by_node_id(cls, context, node_id, limit=None, marker=None,
                         sort_key=None, sort_dir=None):
-        """Return a list of Port objects associated with a given node ID.
+        """Return a list of Portgroup objects associated with a given node ID.
 
         :param context: Security context.
         :param node_id: the ID of the node.
@@ -178,46 +189,23 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
         :param marker: pagination marker for large data sets.
         :param sort_key: column to sort results by.
         :param sort_dir: direction to sort. "asc" or "desc".
-        :returns: a list of :class:`Port` object.
+        :returns: a list of :class:`Portgroup` object.
+        :raises: InvalidParameterValue
 
         """
-        db_ports = cls.dbapi.get_ports_by_node_id(node_id, limit=limit,
-                                                  marker=marker,
-                                                  sort_key=sort_key,
-                                                  sort_dir=sort_dir)
-        return Port._from_db_object_list(db_ports, cls, context)
-
-    # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
-    # methods can be used in the future to replace current explicit RPC calls.
-    # Implications of calling new remote procedures should be thought through.
-    # @object_base.remotable_classmethod
-    @classmethod
-    def list_by_portgroup_id(cls, context, portgroup_id, limit=None,
-                             marker=None, sort_key=None, sort_dir=None):
-        """Return a list of Port objects associated with a given portgroup ID.
-
-        :param context: Security context.
-        :param portgroup_id: the ID of the portgroup.
-        :param limit: maximum number of resources to return in a single result.
-        :param marker: pagination marker for large data sets.
-        :param sort_key: column to sort results by.
-        :param sort_dir: direction to sort. "asc" or "desc".
-        :returns: a list of :class:`Port` object.
-
-        """
-        db_ports = cls.dbapi.get_ports_by_portgroup_id(portgroup_id,
-                                                       limit=limit,
-                                                       marker=marker,
-                                                       sort_key=sort_key,
-                                                       sort_dir=sort_dir)
-        return Port._from_db_object_list(db_ports, cls, context)
+        db_portgroups = cls.dbapi.get_portgroups_by_node_id(node_id,
+                                                            limit=limit,
+                                                            marker=marker,
+                                                            sort_key=sort_key,
+                                                            sort_dir=sort_dir)
+        return Portgroup._from_db_object_list(db_portgroups, cls, context)
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
     # Implications of calling new remote procedures should be thought through.
     # @object_base.remotable
     def create(self, context=None):
-        """Create a Port record in the DB.
+        """Create a Portgroup record in the DB.
 
         :param context: Security context. NOTE: This should only
                         be used internally by the indirection_api.
@@ -225,31 +213,30 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
                         argument, even though we don't use it.
                         A context should be set when instantiating the
                         object, e.g.: Port(context)
-        :raises: MACAlreadyExists if 'address' column is not unique
-        :raises: PortAlreadyExists if 'uuid' column is not unique
+        :raises: DuplicateName, MACAlreadyExists, PortgroupAlreadyExists
 
         """
         values = self.obj_get_changes()
-        db_port = self.dbapi.create_port(values)
-        self._from_db_object(self, db_port)
+        db_portgroup = self.dbapi.create_portgroup(values)
+        self._from_db_object(self, db_portgroup)
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
     # Implications of calling new remote procedures should be thought through.
     # @object_base.remotable
     def destroy(self, context=None):
-        """Delete the Port from the DB.
+        """Delete the Portgroup from the DB.
 
         :param context: Security context. NOTE: This should only
                         be used internally by the indirection_api.
                         Unfortunately, RPC requires context as the first
                         argument, even though we don't use it.
                         A context should be set when instantiating the
-                        object, e.g.: Port(context)
-        :raises: PortNotFound
+                        object, e.g.: Portgroup(context)
+        :raises: PortgroupNotEmpty, PortgroupNotFound
 
         """
-        self.dbapi.destroy_port(self.uuid)
+        self.dbapi.destroy_portgroup(self.uuid)
         self.obj_reset_changes()
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
@@ -257,7 +244,7 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
     # Implications of calling new remote procedures should be thought through.
     # @object_base.remotable
     def save(self, context=None):
-        """Save updates to this Port.
+        """Save updates to this Portgroup.
 
         Updates will be made column by column based on the result
         of self.what_changed().
@@ -267,21 +254,21 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
                         Unfortunately, RPC requires context as the first
                         argument, even though we don't use it.
                         A context should be set when instantiating the
-                        object, e.g.: Port(context)
-        :raises: PortNotFound
-        :raises: MACAlreadyExists if 'address' column is not unique
+                        object, e.g.: Portgroup(context)
+        :raises: PortgroupNotFound, DuplicateName, MACAlreadyExists
 
         """
         updates = self.obj_get_changes()
-        updated_port = self.dbapi.update_port(self.uuid, updates)
-        self._from_db_object(self, updated_port)
+        self.dbapi.update_portgroup(self.uuid, updates)
+
+        self.obj_reset_changes()
 
     # NOTE(xek): We don't want to enable RPC on this call just yet. Remotable
     # methods can be used in the future to replace current explicit RPC calls.
     # Implications of calling new remote procedures should be thought through.
     # @object_base.remotable
     def refresh(self, context=None):
-        """Loads updates for this Port.
+        """Loads updates for this Portgroup.
 
         Loads a port with the same uuid from the database and
         checks for updated attributes. Updates are applied from
@@ -292,8 +279,8 @@ class Port(base.IronicObject, object_base.VersionedObjectDictCompat):
                         Unfortunately, RPC requires context as the first
                         argument, even though we don't use it.
                         A context should be set when instantiating the
-                        object, e.g.: Port(context)
-        :raises: PortNotFound
+                        object, e.g.: Portgroup(context)
+        :raises: PortgroupNotFound
 
         """
         current = self.__class__.get_by_uuid(self._context, uuid=self.uuid)
