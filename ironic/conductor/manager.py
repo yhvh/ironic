@@ -212,7 +212,7 @@ class ConductorManager(periodic_task.PeriodicTasks):
     """Ironic Conductor manager main class."""
 
     # NOTE(rloo): This must be in sync with rpcapi.ConductorAPI's.
-    RPC_API_VERSION = '1.31'
+    RPC_API_VERSION = '1.32'
 
     target = messaging.Target(version=RPC_API_VERSION)
 
@@ -1599,6 +1599,25 @@ class ConductorManager(periodic_task.PeriodicTasks):
                          '%(node)s'),
                      {'port': port.uuid, 'node': task.node.uuid})
 
+    def destroy_portgroup(self, context, portgroup):
+        """Delete a portgroup.
+
+        :param context: request context.
+        :param portgroup: portgroup object
+        :raises: NodeLocked if node is locked by another conductor.
+        :raises: NodeNotFound if the node associated with the portgroup does
+                 not exist.
+
+        """
+        LOG.debug('RPC destroy_portgroup called for portgroup %(portgroup)s',
+                  {'portgroup': portgroup.uuid})
+        with task_manager.acquire(context, portgroup.node_id) as task:
+            portgroup.destroy()
+            LOG.info(_LI('Successfully deleted portgroup %(portgroup)s. '
+                         'The node associated with the portgroup was '
+                         '%(node)s'),
+                     {'portgroup': portgroup.uuid, 'node': task.node.uuid})
+
     @messaging.expected_exceptions(exception.NodeLocked,
                                    exception.UnsupportedDriverExtension,
                                    exception.NodeConsoleNotEnabled,
@@ -1740,6 +1759,45 @@ class ConductorManager(periodic_task.PeriodicTasks):
             port_obj.save()
 
             return port_obj
+
+    def update_portgroup(self, context, portgroup_obj):
+        """Update a portgroup.
+
+        :param context: request context.
+        :param portgroup_obj: a changed (but not saved) portgroup object.
+        :raises: DHCPLoadError if the dhcp_provider cannot be loaded.
+        :raises: FailedToUpdateMacOnPort if MAC address changed and update
+                 failed.
+        :raises: PortgroupMACAlreadyExists if the update is setting a MAC which
+                 is registered on another portgroup already.
+        """
+        portgroup_uuid = portgroup_obj.uuid
+        LOG.debug("RPC update_portgroup called for portgroup %s.",
+                  portgroup_uuid)
+
+        with task_manager.acquire(context, portgroup_obj.node_id) as task:
+            node = task.node
+            if 'address' in portgroup_obj.obj_what_changed():
+                vif = portgroup_obj.extra.get('vif_portgroup_id')
+                if vif:
+                    api = dhcp_factory.DHCPFactory()
+                    api.provider.update_portgroup_address(
+                        vif,
+                        portgroup_obj.address,
+                        token=context.auth_token)
+                # Log warning if there is no vif_port_id and an instance
+                # is associated with the node.
+                elif node.instance_uuid:
+                    LOG.warning(_LW(
+                        "No VIF found for instance %(instance)s "
+                        "portgroup %(portgroup)s when attempting to update"
+                        " port MAC address."),
+                        {'portgroup': portgroup_uuid,
+                         'instance': node.instance_uuid})
+
+            portgroup_obj.save()
+
+            return portgroup_obj
 
     @messaging.expected_exceptions(exception.DriverNotFound)
     def get_driver_properties(self, context, driver_name):

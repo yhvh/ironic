@@ -342,3 +342,10 @@ class RPCAPITestCase(base.DbTestCase):
                           version='1.31',
                           objinst='fake-object',
                           object_versions={'fake-object': '1.0'})
+
+    def test_update_portgroup(self):
+        fake_portgroup = dbutils.get_test_portgroup()
+        self._test_rpcapi('update_portgroup',
+                          'call',
+                          version='1.32',
+                          portgroup_obj=fake_portgroup)

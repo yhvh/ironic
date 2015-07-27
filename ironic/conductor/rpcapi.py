@@ -78,11 +78,12 @@ class ConductorAPI(object):
     |    1.31 - Added Versioned Objects indirection API methods:
     |           object_class_action_versions, object_action and
     |           object_backport_versions
+    |    1.32 - Added update and destroy portgroup
 
     """
 
     # NOTE(rloo): This must be in sync with manager.ConductorManager's.
-    RPC_API_VERSION = '1.31'
+    RPC_API_VERSION = '1.32'
 
     def __init__(self, topic=None):
         super(ConductorAPI, self).__init__()
@@ -434,6 +435,24 @@ class ConductorAPI(object):
         cctxt = self.client.prepare(topic=topic or self.topic, version='1.13')
         return cctxt.call(context, 'update_port', port_obj=port_obj)
 
+    def update_portgroup(self, context, portgroup_obj, topic=None):
+        """Synchronously, have a conductor update the portgroup's information.
+
+        Update the portgroup's information in the database and return a
+        portgroup object.
+        The conductor will lock related node and trigger specific driver
+        actions if they are needed.
+
+        :param context: request context.
+        :param portgroup_obj: a changed (but not saved) portgroup object.
+        :param topic: RPC topic. Defaults to self.topic.
+        :returns: updated portgroup object, including all fields.
+
+        """
+        cctxt = self.client.prepare(topic=topic or self.topic, version='1.32')
+        return cctxt.call(context, 'update_portgroup',
+                          portgroup_obj=portgroup_obj)
+
     def get_driver_properties(self, context, driver_name, topic=None):
         """Get the properties of the driver.
 
@@ -663,3 +682,16 @@ class ConductorAPI(object):
         cctxt = self.client.prepare(topic=self.topic, version='1.31')
         return cctxt.call(context, 'object_backport_versions', objinst=objinst,
                           object_versions=object_versions)
+
+    def destroy_portgroup(self, context, portgroup, topic=None):
+        """Delete a portgroup.
+
+        :param context: request context.
+        :param portgroup: portgroup object
+        :param topic: RPC topic. Defaults to self.topic.
+        :raises: NodeLocked if node is locked by another conductor.
+        :raises: NodeNotFound if the node associated with the portgroup does
+                 not exist.
+        """
+        cctxt = self.client.prepare(topic=topic or self.topic, version='1.32')
+        return cctxt.call(context, 'destroy_portgroup', portgroup=portgroup)
