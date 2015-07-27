@@ -278,3 +278,15 @@ class TestListType(base.TestCase):
         self.assertItemsEqual(['foo', 'bar'],
                               v.validate("foo,foo,foo,bar"))
         self.assertIsInstance(v.validate('foo,bar'), list)
+
+
+class TestLocalLinkConnectionType(base.TestCase):
+
+    def test_local_link_connection_type(self):
+        v = types.LocalLinkConnectionType()
+        self.assertItemsEqual({'switch_id': '0a:1b:2c:3d:4e:5f',
+                               'port_id': 'value2',
+                               'switch_info': 'value3'},
+                              v.validate({'switch_id': '0a:1b:2c:3d:4e:5f',
+                                          'port_id': 'value2',
+                                          'switch_info': 'value3'}))

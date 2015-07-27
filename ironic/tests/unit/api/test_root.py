@@ -46,7 +46,8 @@ class TestV1Root(base.BaseApiTest):
         # Check if all known resources are present and there are no extra ones.
         not_resources = ('id', 'links', 'media_types')
         actual_resources = tuple(set(data.keys()) - set(not_resources))
-        expected_resources = ('chassis', 'drivers', 'nodes', 'ports')
+        expected_resources = ('chassis', 'drivers', 'nodes', 'ports',
+                              'portgroups')
         self.assertEqual(sorted(expected_resources), sorted(actual_resources))
 
         self.assertIn({'type': 'application/vnd.openstack.ironic.v1+json',

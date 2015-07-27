@@ -30,6 +30,7 @@ from ironic.api.controllers import base
 from ironic.api.controllers import link
 from ironic.api.controllers.v1 import collection
 from ironic.api.controllers.v1 import port
+from ironic.api.controllers.v1 import portgroup
 from ironic.api.controllers.v1 import types
 from ironic.api.controllers.v1 import utils as api_utils
 from ironic.api.controllers.v1 import versions
@@ -628,6 +629,9 @@ class Node(base.APIBase):
     states = wsme.wsattr([link.Link], readonly=True)
     """Links to endpoint for retrieving and setting node states"""
 
+    portgroups = wsme.wsattr([link.Link], readonly=True)
+    """Links to the collection of portgroups on this node"""
+
     # NOTE(deva): "conductor_affinity" shouldn't be presented on the
     #             API because it's an internal value. Don't add it here.
 
@@ -672,6 +676,13 @@ class Node(base.APIBase):
                                link.Link.make_link('bookmark', url, 'nodes',
                                                    node_uuid + "/states",
                                                    bookmark=True)]
+
+            node.portgroups = [link.Link.make_link('self', url, 'nodes',
+                                                   node_uuid + "/portgroups"),
+                               link.Link.make_link('bookmark', url, 'nodes',
+                                                   node_uuid + "/portgroups",
+                                                   bookmark=True)
+                               ]
 
         if not show_password and node.driver_info != wtypes.Unset:
             node.driver_info = ast.literal_eval(strutils.mask_password(
@@ -857,6 +868,9 @@ class NodesController(rest.RestController):
     ports = port.PortsController()
     """Expose ports as a sub-element of nodes"""
 
+    portgroups = portgroup.PortgroupsController()
+    """Expose portgroups as a sub-element of nodes"""
+
     management = NodeManagementController()
     """Expose management as a sub-element of nodes"""
 
@@ -866,6 +880,10 @@ class NodesController(rest.RestController):
     # Set the flag to indicate that the requests to this resource are
     # coming from a top-level resource
     ports.from_nodes = True
+
+    # Set the flag to indicate that the requests to this resource are
+    # coming from a top-level resource
+    portgroups.from_nodes = True
 
     from_chassis = False
     """A flag to indicate if the requests to this controller are coming

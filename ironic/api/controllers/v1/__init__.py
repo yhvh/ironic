@@ -33,6 +33,7 @@ from ironic.api.controllers.v1 import chassis
 from ironic.api.controllers.v1 import driver
 from ironic.api.controllers.v1 import node
 from ironic.api.controllers.v1 import port
+from ironic.api.controllers.v1 import portgroup
 from ironic.api.controllers.v1 import versions
 from ironic.api import expose
 from ironic.common.i18n import _
@@ -79,6 +80,9 @@ class V1(base.APIBase):
     ports = [link.Link]
     """Links to the ports resource"""
 
+    portgroups = [link.Link]
+    """Links to the portgroups resource"""
+
     drivers = [link.Link]
     """Links to the drivers resource"""
 
@@ -117,6 +121,14 @@ class V1(base.APIBase):
                                         'ports', '',
                                         bookmark=True)
                     ]
+
+        v1.portgroups = [link.Link.make_link('self', pecan.request.public_url,
+                                             'portgroups', ''),
+                         link.Link.make_link('bookmark',
+                                             pecan.request.public_url,
+                                             'portgroups', '',
+                                             bookmark=True)
+                         ]
         v1.drivers = [link.Link.make_link('self', pecan.request.public_url,
                                           'drivers', ''),
                       link.Link.make_link('bookmark',
@@ -132,6 +144,7 @@ class Controller(rest.RestController):
 
     nodes = node.NodesController()
     ports = port.PortsController()
+    portgroups = portgroup.PortgroupsController()
     chassis = chassis.ChassisController()
     drivers = driver.DriversController()
 

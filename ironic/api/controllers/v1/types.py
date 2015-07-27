@@ -269,3 +269,39 @@ class JsonPatchType(wtypes.Base):
         if patch.value is not wsme.Unset:
             ret['value'] = patch.value
         return ret
+
+
+class LocalLinkConnectionType(JsonType):
+    """A type describing local link connection"""
+
+    valid_fields = {'switch_id',
+                    'port_id',
+                    'switch_info'}
+
+    mandatory_fields = {'switch_id',
+                        'port_id'}
+
+    name = 'locallinkconnection'
+    __name__ = name
+
+    @staticmethod
+    def validate(value):
+        JsonType.validate(value)
+
+        keys = set(value.keys())
+        invalid = keys - LocalLinkConnectionType.valid_fields
+        if invalid:
+            raise exception.Invalid(_('%s are invalid keys') % (invalid))
+        if keys:
+            # Check all mandatory fields are present
+            missing = LocalLinkConnectionType.mandatory_fields - keys
+            if missing:
+                msg = _('Missing mandatory keys: %s') % (missing)
+                raise exception.Invalid(msg)
+
+            # Check the switch_id is a valid mac address
+            MacAddressType.validate(value['switch_id'])
+        return value
+
+
+locallinkconnectiontype = LocalLinkConnectionType()
