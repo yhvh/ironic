@@ -25,6 +25,7 @@ from ironic.common.i18n import _LI
 from ironic.common.i18n import _LW
 from ironic.common import image_service
 from ironic.common import images
+from ironic.common import network
 from ironic.common import paths
 from ironic.common import raid
 from ironic.common import states
@@ -219,7 +220,7 @@ class AgentDeploy(base.DeployInterface):
         :param task: a TaskManager instance.
         :returns: status of the deploy. One of ironic.common.states.
         """
-        manager_utils.node_power_action(task, states.REBOOT)
+        manager_utils.node_power_action(task, states.POWER_ON)
         return states.DEPLOYWAIT
 
     @task_manager.require_exclusive_lock
@@ -230,6 +231,8 @@ class AgentDeploy(base.DeployInterface):
         :returns: status of the deploy. One of ironic.common.states.
         """
         manager_utils.node_power_action(task, states.POWER_OFF)
+        provider = network.get_network_provider(task)
+        provider.remove_provisioning_network(task)
         return states.DELETED
 
     def prepare(self, task):
@@ -242,6 +245,13 @@ class AgentDeploy(base.DeployInterface):
         # take over.
         node = task.node
         if node.provision_state != states.ACTIVE:
+            # Adding the node to provisioning network so that the dhcp options
+            # get added for the provisioning port.
+            manager_utils.node_power_action(task, states.POWER_OFF)
+
+            provider = network.get_network_provider(task)
+            provider.add_provisioning_network(task)
+
             node.instance_info = build_instance_info_for_deploy(task)
             node.save()
             if CONF.agent.manage_agent_boot:

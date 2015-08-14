@@ -270,7 +270,10 @@ class IRMCDeployPrivateMethodsTestCase(db_base.DbTestCase):
                        autospec=True)
     @mock.patch.object(images, 'fetch', spec_set=True,
                        autospec=True)
+    @mock.patch('ironic.networks.none.NoopNetworkProvider.'
+                'add_provisioning_network', spec_set=True, autospec=True)
     def test__reboot_into_deploy_iso_with_file(self,
+                                               add_provisioning_net_mock,
                                                fetch_mock,
                                                setup_vmedia_mock,
                                                set_boot_device_mock,
@@ -289,7 +292,10 @@ class IRMCDeployPrivateMethodsTestCase(db_base.DbTestCase):
                 ramdisk_opts)
             set_boot_device_mock.assert_called_once_with(task,
                                                          boot_devices.CDROM)
-            node_power_action_mock.assert_called_once_with(task, states.REBOOT)
+            node_power_action_mock.assert_has_calls([
+                mock.call(task, states.POWER_OFF),
+                mock.call(task, states.POWER_ON)])
+            add_provisioning_net_mock.assert_called_once_with(mock.ANY, task)
 
     @mock.patch.object(manager_utils, 'node_power_action', spec_set=True,
                        autospec=True)
@@ -301,8 +307,11 @@ class IRMCDeployPrivateMethodsTestCase(db_base.DbTestCase):
                        autospec=True)
     @mock.patch.object(service_utils, 'is_image_href_ordinary_file_name',
                        spec_set=True, autospec=True)
+    @mock.patch('ironic.networks.none.NoopNetworkProvider.'
+                'add_provisioning_network', spec_set=True, autospec=True)
     def test__reboot_into_deploy_iso_with_image_service(
             self,
+            add_provisioning_net_mock,
             is_image_href_ordinary_file_name_mock,
             fetch_mock,
             setup_vmedia_mock,
@@ -328,8 +337,10 @@ class IRMCDeployPrivateMethodsTestCase(db_base.DbTestCase):
                 ramdisk_opts)
             set_boot_device_mock.assert_called_once_with(
                 task, boot_devices.CDROM)
-            node_power_action_mock.assert_called_once_with(
-                task, states.REBOOT)
+            node_power_action_mock.assert_has_calls([
+                mock.call(task, states.POWER_OFF),
+                mock.call(task, states.POWER_ON)])
+            add_provisioning_net_mock.assert_called_once_with(mock.ANY, task)
 
     def test__get_deploy_iso_name(self):
         actual = irmc_deploy._get_deploy_iso_name(self.node)
@@ -1134,6 +1145,8 @@ class VendorPassthruTestCase(db_base.DbTestCase):
             finish_deploy_mock.assert_called_once_with(task, '123456')
             validate_input_mock.assert_called_once_with(task, kwargs)
 
+    @mock.patch.object(manager_utils, 'node_power_action', spec_set=True,
+                       autospec=True)
     @mock.patch.object(deploy_utils, 'set_failed_state', spec_set=True,
                        autospec=True)
     @mock.patch.object(deploy_utils, 'notify_ramdisk_to_proceed',
@@ -1155,7 +1168,8 @@ class VendorPassthruTestCase(db_base.DbTestCase):
                                  setup_vmedia_for_boot_mock,
                                  node_set_boot_device_mock,
                                  notify_ramdisk_to_proceed_mock,
-                                 set_failed_state_mock):
+                                 set_failed_state_mock,
+                                 node_power_action_mock):
         kwargs = {'method': 'pass_deploy_info', 'address': '123456'}
         continue_deploy_mock.return_value = {'root uuid': 'root_uuid'}
 
@@ -1182,6 +1196,9 @@ class VendorPassthruTestCase(db_base.DbTestCase):
             self.assertEqual(states.ACTIVE, task.node.provision_state)
             self.assertEqual(states.NOSTATE, task.node.target_provision_state)
             self.assertFalse(set_failed_state_mock.called)
+            node_power_action_mock.assert_has_calls([
+                mock.call(task, states.POWER_OFF),
+                mock.call(task, states.POWER_ON)])
 
     @mock.patch.object(deploy_utils, 'set_failed_state', spec_set=True,
                        autospec=True)

@@ -32,6 +32,7 @@ from ironic.common.i18n import _LE
 from ironic.common.i18n import _LI
 from ironic.common.i18n import _LW
 from ironic.common import images
+from ironic.common import network
 from ironic.common import states
 from ironic.common import utils
 from ironic.conductor import task_manager
@@ -204,6 +205,7 @@ def _parse_deploy_info(node):
     return deploy_info
 
 
+@task_manager.require_exclusive_lock
 def _reboot_into_deploy_iso(task, ramdisk_options):
     """Reboots the node into a given deploy ISO.
 
@@ -233,7 +235,12 @@ def _reboot_into_deploy_iso(task, ramdisk_options):
 
     setup_vmedia_for_boot(task, deploy_iso_file, ramdisk_options)
     manager_utils.node_set_boot_device(task, boot_devices.CDROM)
-    manager_utils.node_power_action(task, states.REBOOT)
+    manager_utils.node_power_action(task, states.POWER_OFF)
+
+    provider = network.get_network_provider(task)
+    provider.add_provisioning_network(task)
+
+    manager_utils.node_power_action(task, states.POWER_ON)
 
 
 def _get_deploy_iso_name(node):
@@ -627,6 +634,8 @@ class IRMCVirtualMediaIscsiDeploy(base.DeployInterface):
         task.node.driver_internal_info = driver_internal_info
         task.node.save()
         manager_utils.node_power_action(task, states.POWER_OFF)
+        provider = network.get_network_provider(task)
+        provider.remove_provisioning_network(task)
         return states.DELETED
 
     def prepare(self, task):
@@ -719,6 +728,8 @@ class IRMCVirtualMediaAgentDeploy(base.DeployInterface):
         :returns: states.DELETED
         """
         manager_utils.node_power_action(task, states.POWER_OFF)
+        provider = network.get_network_provider(task)
+        provider.remove_provisioning_network(task)
         return states.DELETED
 
     def prepare(self, task):

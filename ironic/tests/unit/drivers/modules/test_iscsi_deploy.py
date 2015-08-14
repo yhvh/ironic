@@ -900,7 +900,9 @@ class IscsiDeployMethodsTestCase(db_base.DbTestCase):
             notify_mock.assert_called_once_with('1.2.3.4')
             self.assertEqual(states.ACTIVE, task.node.provision_state)
             self.assertEqual(states.NOSTATE, task.node.target_provision_state)
-            node_power_mock.assert_called_once_with(task, states.REBOOT)
+            node_power_mock.assert_has_calls([
+                mock.call(task, states.POWER_OFF),
+                mock.call(task, states.POWER_ON)])
 
     @mock.patch.object(keystone, 'get_service_url', autospec=True)
     def test_validate_good_api_url_from_config_file(self, mock_ks):
@@ -984,8 +986,7 @@ class ISCSIDeployTestCase(db_base.DbTestCase):
 
     @mock.patch.object(pxe.PXEBoot, 'prepare_instance', autospec=True)
     def test_prepare_node_active(self, prepare_instance_mock):
-        with task_manager.acquire(self.context, self.node.uuid,
-                                  shared=True) as task:
+        with task_manager.acquire(self.context, self.node.uuid) as task:
             task.node.provision_state = states.ACTIVE
 
             task.driver.deploy.prepare(task)
@@ -997,12 +998,14 @@ class ISCSIDeployTestCase(db_base.DbTestCase):
     @mock.patch.object(iscsi_deploy, 'build_deploy_ramdisk_options',
                        autospec=True)
     @mock.patch.object(pxe.PXEBoot, 'prepare_ramdisk', autospec=True)
-    def test_prepare_node_deploying(self, mock_prepare_ramdisk,
+    @mock.patch('ironic.networks.none.NoopNetworkProvider.'
+                'add_provisioning_network', spec_set=True, autospec=True)
+    def test_prepare_node_deploying(self, add_provisioning_net_mock,
+                                    mock_prepare_ramdisk,
                                     mock_iscsi_options, mock_agent_options):
         mock_iscsi_options.return_value = {'a': 'b'}
         mock_agent_options.return_value = {'c': 'd'}
-        with task_manager.acquire(self.context, self.node.uuid,
-                                  shared=True) as task:
+        with task_manager.acquire(self.context, self.node.uuid) as task:
             task.node.provision_state = states.DEPLOYWAIT
 
             task.driver.deploy.prepare(task)
@@ -1011,6 +1014,7 @@ class ISCSIDeployTestCase(db_base.DbTestCase):
             mock_agent_options.assert_called_once_with(task.node)
             mock_prepare_ramdisk.assert_called_once_with(
                 task.driver.boot, task, {'a': 'b', 'c': 'd'})
+            add_provisioning_net_mock.assert_called_once_with(mock.ANY, task)
 
     @mock.patch.object(manager_utils, 'node_power_action', autospec=True)
     @mock.patch.object(iscsi_deploy, 'check_image_size', autospec=True)
@@ -1024,7 +1028,8 @@ class ISCSIDeployTestCase(db_base.DbTestCase):
             mock_cache_instance_image.assert_called_once_with(
                 self.context, task.node)
             mock_check_image_size.assert_called_once_with(task)
-            mock_node_power_action.assert_called_once_with(task, states.REBOOT)
+            mock_node_power_action.assert_called_once_with(task,
+                                                           states.POWER_ON)
 
     @mock.patch.object(manager_utils, 'node_power_action', autospec=True)
     def test_tear_down(self, node_power_action_mock):

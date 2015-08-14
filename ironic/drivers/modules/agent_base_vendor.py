@@ -30,6 +30,7 @@ from ironic.common.i18n import _
 from ironic.common.i18n import _LE
 from ironic.common.i18n import _LI
 from ironic.common.i18n import _LW
+from ironic.common import network
 from ironic.common import states
 from ironic.common import utils
 from ironic.conductor import manager
@@ -602,7 +603,13 @@ class BaseAgentVendor(base.VendorInterface):
                     {'node_uuid': node.uuid,
                      'timeout': (wait * (attempts - 1)) / 1000,
                      'error': e})
-            manager_utils.node_power_action(task, states.REBOOT)
+            manager_utils.node_power_action(task, states.POWER_OFF)
+
+            provider = network.get_network_provider(task)
+            provider.remove_provisioning_network(task)
+            provider.configure_tenant_networks(task)
+
+            manager_utils.node_power_action(task, states.POWER_ON)
         except Exception as e:
             msg = (_('Error rebooting node %(node)s after deploy. '
                      'Error: %(error)s') %

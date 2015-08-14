@@ -36,6 +36,7 @@ from ironic.drivers.modules import agent_base_vendor
 from ironic.drivers.modules import deploy_utils
 from ironic.drivers.modules.ilo import common as ilo_common
 from ironic.drivers.modules.ilo import deploy as ilo_deploy
+from ironic.drivers.modules.ilo import power as ilo_power
 from ironic.drivers.modules import iscsi_deploy
 from ironic.drivers import utils as driver_utils
 from ironic.tests.unit.conductor import mgr_utils
@@ -369,8 +370,10 @@ class IloDeployPrivateMethodsTestCase(db_base.DbTestCase):
                        autospec=True)
     @mock.patch.object(ilo_common, 'setup_vmedia_for_boot', spec_set=True,
                        autospec=True)
-    def test__reboot_into(self, setup_vmedia_mock, set_boot_device_mock,
-                          node_power_action_mock):
+    @mock.patch('ironic.networks.none.NoopNetworkProvider.'
+                'add_provisioning_network', spec_set=True, autospec=True)
+    def test__reboot_into(self, add_provisioning_net_mock, setup_vmedia_mock,
+                          set_boot_device_mock, node_power_action_mock):
         with task_manager.acquire(self.context, self.node.uuid,
                                   shared=False) as task:
             opts = {'a': 'b'}
@@ -378,7 +381,10 @@ class IloDeployPrivateMethodsTestCase(db_base.DbTestCase):
             setup_vmedia_mock.assert_called_once_with(task, 'iso', opts)
             set_boot_device_mock.assert_called_once_with(task,
                                                          boot_devices.CDROM)
-            node_power_action_mock.assert_called_once_with(task, states.REBOOT)
+            node_power_action_mock.assert_has_calls([
+                mock.call(task, states.POWER_OFF),
+                mock.call(task, states.POWER_ON)])
+            add_provisioning_net_mock.assert_called_once_with(mock.ANY, task)
 
     @mock.patch.object(ilo_common, 'eject_vmedia_devices',
                        spec_set=True, autospec=True)
@@ -1232,6 +1238,8 @@ class VendorPassthruTestCase(db_base.DbTestCase):
             finish_deploy_mock.assert_called_once_with(task, '123456')
             validate_input_mock.assert_called_once_with(task, kwargs)
 
+    @mock.patch.object(ilo_power, '_set_power_state', spec_set=True,
+                       autospec=True)
     @mock.patch.object(deploy_utils, 'notify_ramdisk_to_proceed',
                        spec_set=True, autospec=True)
     @mock.patch.object(ilo_deploy, '_update_secure_boot_mode', spec_set=True,
@@ -1253,7 +1261,8 @@ class VendorPassthruTestCase(db_base.DbTestCase):
                                    setup_vmedia_mock, set_boot_device_mock,
                                    func_update_boot_mode,
                                    func_update_secure_boot_mode,
-                                   notify_ramdisk_to_proceed_mock):
+                                   notify_ramdisk_to_proceed_mock,
+                                   set_power_state_mock):
         kwargs = {'method': 'pass_deploy_info', 'address': '123456'}
         continue_deploy_mock.return_value = {'root uuid': 'root-uuid'}
         get_boot_iso_mock.return_value = 'boot-iso'
@@ -1282,6 +1291,9 @@ class VendorPassthruTestCase(db_base.DbTestCase):
             info = task.node.driver_internal_info['root_uuid_or_disk_id']
             self.assertEqual('root-uuid', info)
             notify_ramdisk_to_proceed_mock.assert_called_once_with('123456')
+            set_power_state_mock.assert_has_calls([
+                mock.call(task, states.POWER_OFF),
+                mock.call(task, states.POWER_ON)])
 
     @mock.patch.object(ilo_common, 'cleanup_vmedia_boot', spec_set=True,
                        autospec=True)

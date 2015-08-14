@@ -28,6 +28,7 @@ from ironic.common.i18n import _LE
 from ironic.common.i18n import _LI
 from ironic.common.i18n import _LW
 from ironic.common import keystone
+from ironic.common import network
 from ironic.common import states
 from ironic.common import utils
 from ironic.conductor import manager
@@ -608,6 +609,7 @@ def validate_bootloader_install_status(task, input_params):
     LOG.info(_LI('Bootloader successfully installed on node %s'), node.uuid)
 
 
+@task_manager.require_exclusive_lock
 def finish_deploy(task, address):
     """Notifies the ramdisk to reboot the node and makes the instance active.
 
@@ -637,8 +639,13 @@ def finish_deploy(task, address):
     # machine is powered off and on again. So the code below is enforcing
     # it. For Liberty we need to change the DIB ramdisk so that Ironic
     # always controls the power state of the node for all drivers.
-    if deploy_utils.get_boot_option(node) == "local" and 'ssh' in node.driver:
-        manager_utils.node_power_action(task, states.REBOOT)
+    manager_utils.node_power_action(task, states.POWER_OFF)
+
+    provider = network.get_network_provider(task)
+    provider.remove_provisioning_network(task)
+    provider.configure_tenant_networks(task)
+
+    manager_utils.node_power_action(task, states.POWER_ON)
 
     LOG.info(_LI('Deployment to node %s done'), node.uuid)
     task.process_event('done')
@@ -686,7 +693,7 @@ class ISCSIDeploy(base.DeployInterface):
         cache_instance_image(task.context, node)
         check_image_size(task)
 
-        manager_utils.node_power_action(task, states.REBOOT)
+        manager_utils.node_power_action(task, states.POWER_ON)
 
         return states.DEPLOYWAIT
 
@@ -701,8 +708,11 @@ class ISCSIDeploy(base.DeployInterface):
         :returns: deploy state DELETED.
         """
         manager_utils.node_power_action(task, states.POWER_OFF)
+        provider = network.get_network_provider(task)
+        provider.remove_provisioning_network(task)
         return states.DELETED
 
+    @task_manager.require_exclusive_lock
     def prepare(self, task):
         """Prepare the deployment environment for this task's node.
 
@@ -716,6 +726,13 @@ class ISCSIDeploy(base.DeployInterface):
         if node.provision_state == states.ACTIVE:
             task.driver.boot.prepare_instance(task)
         else:
+            # Adding the node to provisioning network so that the dhcp options
+            # get added for the provisioning port.
+            manager_utils.node_power_action(task, states.POWER_OFF)
+
+            provider = network.get_network_provider(task)
+            provider.add_provisioning_network(task)
+
             deploy_opts = build_deploy_ramdisk_options(node)
 
             # NOTE(lucasagomes): We are going to extend the normal PXE config

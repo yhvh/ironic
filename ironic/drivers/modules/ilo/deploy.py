@@ -33,6 +33,7 @@ from ironic.common.i18n import _LI
 from ironic.common.i18n import _LW
 from ironic.common import image_service
 from ironic.common import images
+from ironic.common import network
 from ironic.common import states
 from ironic.common import swift
 from ironic.common import utils
@@ -305,6 +306,7 @@ def _parse_deploy_info(node):
     return info
 
 
+@task_manager.require_exclusive_lock
 def _reboot_into(task, iso, ramdisk_options):
     """Reboots the node into a given boot ISO.
 
@@ -334,7 +336,12 @@ def _reboot_into(task, iso, ramdisk_options):
     # the server twice. But it retains one time boot settings across internal
     # resets. Hence no impact of this change for secure boot deploy.
     manager_utils.node_set_boot_device(task, boot_devices.CDROM)
-    manager_utils.node_power_action(task, states.REBOOT)
+    manager_utils.node_power_action(task, states.POWER_OFF)
+
+    provider = network.get_network_provider(task)
+    provider.add_provisioning_network(task)
+
+    manager_utils.node_power_action(task, states.POWER_ON)
 
 
 def _prepare_agent_vmedia_boot(task):
@@ -542,8 +549,11 @@ class IloVirtualMediaIscsiDeploy(base.DeployInterface):
         driver_internal_info.pop('root_uuid_or_disk_id', None)
         task.node.driver_internal_info = driver_internal_info
         task.node.save()
+        provider = network.get_network_provider(task)
+        provider.remove_provisioning_network(task)
         return states.DELETED
 
+    @task_manager.require_exclusive_lock
     def prepare(self, task):
         """Prepare the deployment environment for this task's node.
 
@@ -552,6 +562,8 @@ class IloVirtualMediaIscsiDeploy(base.DeployInterface):
         """
         if task.node.provision_state != states.ACTIVE:
             _prepare_node_for_deploy(task)
+            provider = network.get_network_provider(task)
+            provider.add_provisioning_network(task)
 
     def clean_up(self, task):
         """Clean up the deployment environment for the task's node.
@@ -627,9 +639,12 @@ class IloVirtualMediaAgentDeploy(base.DeployInterface):
         :returns: states.DELETED
         """
         manager_utils.node_power_action(task, states.POWER_OFF)
+        provider = network.get_network_provider(task)
+        provider.remove_provisioning_network(task)
         _disable_secure_boot_if_supported(task)
         return states.DELETED
 
+    @task_manager.require_exclusive_lock
     def prepare(self, task):
         """Prepare the deployment environment for this node.
 
@@ -640,6 +655,8 @@ class IloVirtualMediaAgentDeploy(base.DeployInterface):
             node.instance_info = agent.build_instance_info_for_deploy(task)
             node.save()
             _prepare_node_for_deploy(task)
+            provider = network.get_network_provider(task)
+            provider.add_provisioning_network(task)
 
     def clean_up(self, task):
         """Clean up the deployment environment for this node.
