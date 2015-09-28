@@ -551,6 +551,92 @@ An example of this is shown in the `Enrollment`_ section.
     --ip-version=4 --gateway=$GATEWAY_IP --allocation-pool \
     start=$START_IP,end=$END_IP --enable-dhcp
 
+Configuring Tenant Networks
+---------------------------
+This configuration allows creating a dedicated tenant network, which extends
+the current Ironic capabilities of providing flat networks. This works in conjunction
+with Neutron to allow for provisioning of the Bare Metal server onto the tenant network.
+The result is that multiple tenants can now deploy in an isolated fashion. However,
+this configuration doesn't support trunked ports belonging to multiple networks,
+as well as a bare metal server that has multiple interfaces belonging to different networks.
+
+Note that change to port membership of a portgroup can be done only when a node
+is in a MANAGEABLE/INSPECTING/ENROLL state.
+It might be safest to only allow this when the node is not in a state where
+uninterrupted connectivity is expected. These limitations will also ensure that Neutron
+port updates should only happen during a state change and not automatically
+with any port-update call.
+
+Below is an example of a process flow to create such a network:
+
+#. Create a neutron provisioning network and add it in ``/etc/ironic/ironic.conf``
+   under the ironic section::
+
+    [ironic]
+    ...
+    provisioning_network_uuid=$UUID
+    network_provider=neutron_plugin
+
+   Also specify network_provider as neutron_plugin, such as::
+
+    network_provider as neutron_plugin goes here
+
+#. Install a compatible ML2 driver which supports Bare Metal provisioning for your switch.
+   Edit ``/etc/neutron/plugins/ml2/ml2_conf.ini`` and modify/add the following::
+
+    [ml2_vendor]
+    param_1=...
+    param_2=...
+    param_3=...
+
+#. Restart the ironic conductor after the modifications::
+
+    Fedora/RHEL7/CentOS7:
+      sudo systemctl restart openstack-ironic-conductor
+
+    Ubuntu:
+      sudo service ironic-conductor restart
+
+#. Make sure that the tftp server is reachable over the provisioning network,
+   by trying to download a file from it::
+
+    tftp $TFTP_IP -c get $FILENAME
+
+   where FILENAME is the file located at the tftp server.
+
+#. A portgroups is a link aggregation, where multiple interfaces on the bare metal server
+   connect to switch ports of a single LAG and belong to the same network. Please remember,
+    as said, that this doesn't work if interfaces belong to multiple networks.
+
+   If you want to group more than one port as a logical interface, add the option in
+   ``/etc/nova/nova.conf`` under the ironic section::
+
+    [ironic]
+    ...
+    use_portgroups=True
+
+   and restart nova-conductor service::
+
+    Fedora/RHEL7/CentOS7:
+      sudo systemctl restart openstack-nova-conductor
+
+    Ubuntu:
+      sudo service nova-conductor restart
+
+   Then create a portgroup in ironic::
+
+    ironic portgroup-create -n $NODE_UUID -a $NEW_MAC_ADDRESS --name $NAME
+
+#. If using a portgroup, create a port as following::
+
+    ironic port-create -a $HW_MAC_ADDRESS -n $NODE_UUID -l switch_id=$SWITCH_MAC_ADDRESS \
+    -l switch_info=$SWITCH_HOSTNAME -l port_id=$SWITCH_PORT \
+    --portgroup-uuid $PORTGROUP_UUID --pxe-enabled true
+
+#. Check the port configuration::
+
+    ironic port-show $PORT_UUID
+
 .. _CleaningNetworkSetup:
 
 Configure the Bare Metal service for cleaning
