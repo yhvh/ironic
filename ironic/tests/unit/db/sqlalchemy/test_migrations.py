@@ -448,6 +448,13 @@ class MigrationCheckersMixin(object):
                         isinstance(ports.c.pxe_enabled.type,
                                    sqlalchemy.types.Integer))
 
+    def _check_abedf32345d(self, engine, data):
+        nodes = db_utils.get_table(engine, 'nodes')
+        col_names = [column.name for column in nodes.c]
+        self.assertIn('network_provider', col_names)
+        self.assertIsInstance(nodes.c.network_provider.type,
+                              sqlalchemy.types.String)
+
     def test_upgrade_and_version(self):
         with patch_with_engine(self.engine):
             self.migration_api.upgrade('head')

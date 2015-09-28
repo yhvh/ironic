@@ -150,6 +150,7 @@ class Node(Base):
     inspection_finished_at = Column(DateTime, nullable=True)
     inspection_started_at = Column(DateTime, nullable=True)
     extra = Column(db_types.JsonEncodedDict)
+    network_provider = Column(String(255))
 
 
 class Port(Base):

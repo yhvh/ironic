@@ -220,6 +220,9 @@ class Connection(api.Connection):
                      (datetime.timedelta(
                          seconds=filters['inspection_started_before'])))
             query = query.filter(models.Node.inspection_started_at < limit)
+        if 'network_provider' in filters:
+            query = query.filter_by(
+                network_provider=filters['network_provider'])
 
         return query
 

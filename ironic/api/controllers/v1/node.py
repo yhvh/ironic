@@ -632,6 +632,9 @@ class Node(base.APIBase):
     portgroups = wsme.wsattr([link.Link], readonly=True)
     """Links to the collection of portgroups on this node"""
 
+    network_provider = wsme.wsattr(wtypes.text)
+    """The network_provider to be used for this node"""
+
     # NOTE(deva): "conductor_affinity" shouldn't be presented on the
     #             API because it's an internal value. Don't add it here.
 

@@ -224,6 +224,7 @@ def get_test_node(**kw):
         'inspection_started_at': kw.get('inspection_started_at'),
         'raid_config': kw.get('raid_config'),
         'target_raid_config': kw.get('target_raid_config'),
+        'network_provider': kw.get('network_provider')
     }
 
 
