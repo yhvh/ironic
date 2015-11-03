@@ -117,7 +117,7 @@ def get_rpc_portgroup(portgroup_ident):
                                              portgroup_ident)
 
     # We can refer to portgroups by their name
-    if utils.is_hostname_safe(portgroup_ident):
+    if utils.is_valid_logical_name(portgroup_ident):
         return objects.Portgroup.get_by_name(pecan.request.context,
                                              portgroup_ident)
     else:
