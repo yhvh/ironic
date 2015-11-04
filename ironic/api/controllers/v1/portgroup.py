@@ -15,6 +15,7 @@ import datetime
 from oslo_utils import uuidutils
 import pecan
 from pecan import rest
+from six.moves import http_client
 import wsme
 from wsme import types as wtypes
 
@@ -64,7 +65,7 @@ class Portgroup(base.APIBase):
             except exception.NodeNotFound as e:
                 # Change error code because 404 (NotFound) is inappropriate
                 # response for a POST request to create a Port
-                e.code = 400  # BadRequest
+                e.code = http_client.BAD_REQUEST
                 raise e
         elif value == wtypes.Unset:
             self._node_uuid = wtypes.Unset
@@ -344,7 +345,7 @@ class PortgroupsController(rest.RestController):
                                                       portgroup_uuid)
         return Portgroup.convert_with_links(rpc_portgroup, fields=fields)
 
-    @expose.expose(Portgroup, body=Portgroup, status_code=201)
+    @expose.expose(Portgroup, body=Portgroup, status_code=http_client.CREATED)
     def post(self, portgroup):
         """Create a new portgroup.
 
@@ -407,7 +408,7 @@ class PortgroupsController(rest.RestController):
 
         return Portgroup.convert_with_links(new_portgroup)
 
-    @expose.expose(None, types.uuid, status_code=204)
+    @expose.expose(None, types.uuid, status_code=http_client.NO_CONTENT)
     def delete(self, portgroup_uuid):
         """Delete a portgroup.
 

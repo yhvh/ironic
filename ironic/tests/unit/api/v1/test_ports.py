@@ -806,7 +806,7 @@ class TestPost(test_api_base.BaseApiTest):
                                    'switch_foo': 'value3'})
         response = self.post_json('/ports', pdict, expect_errors=True)
         self.assertEqual('application/json', response.content_type)
-        self.assertEqual(400, response.status_int)
+        self.assertEqual(http_client.BAD_REQUEST, response.status_int)
         self.assertTrue(response.json['error_message'])
 
     def test_create_port_local_link_connection_keys(self):
@@ -816,7 +816,7 @@ class TestPost(test_api_base.BaseApiTest):
                                    'switch_info': 'value3'})
         response = self.post_json('/ports', pdict)
         self.assertEqual('application/json', response.content_type)
-        self.assertEqual(201, response.status_int)
+        self.assertEqual(http_client.CREATED, response.status_int)
 
     def test_create_port_local_link_connection_switch_id_bad_mac(self):
         pdict = post_get_test_port(
@@ -825,7 +825,7 @@ class TestPost(test_api_base.BaseApiTest):
                                    'switch_info': 'value3'})
         response = self.post_json('/ports', pdict, expect_errors=True)
         self.assertEqual('application/json', response.content_type)
-        self.assertEqual(400, response.status_int)
+        self.assertEqual(http_client.BAD_REQUEST, response.status_int)
         self.assertTrue(response.json['error_message'])
 
     def test_create_port_local_link_connection_missing_mandatory(self):
@@ -834,7 +834,7 @@ class TestPost(test_api_base.BaseApiTest):
                                    'switch_info': 'fooswitch'})
         response = self.post_json('/ports', pdict, expect_errors=True)
         self.assertEqual('application/json', response.content_type)
-        self.assertEqual(400, response.status_int)
+        self.assertEqual(http_client.BAD_REQUEST, response.status_int)
 
     def test_create_port_local_link_connection_missing_optional(self):
         pdict = post_get_test_port(
@@ -842,7 +842,7 @@ class TestPost(test_api_base.BaseApiTest):
                                    'port_id': 'Ethernet1/15'})
         response = self.post_json('/ports', pdict)
         self.assertEqual('application/json', response.content_type)
-        self.assertEqual(201, response.status_int)
+        self.assertEqual(http_client.CREATED, response.status_int)
 
 
 @mock.patch.object(rpcapi.ConductorAPI, 'destroy_port')
