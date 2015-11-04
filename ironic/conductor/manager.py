@@ -1599,6 +1599,8 @@ class ConductorManager(periodic_task.PeriodicTasks):
                          '%(node)s'),
                      {'port': port.uuid, 'node': task.node.uuid})
 
+    @messaging.expected_exceptions(exception.NodeLocked,
+                                   exception.NodeNotFound)
     def destroy_portgroup(self, context, portgroup):
         """Delete a portgroup.
 
@@ -1723,7 +1725,8 @@ class ConductorManager(periodic_task.PeriodicTasks):
 
     @messaging.expected_exceptions(exception.NodeLocked,
                                    exception.FailedToUpdateMacOnPort,
-                                   exception.MACAlreadyExists)
+                                   exception.MACAlreadyExists,
+                                   exception.InvalidStateRequested)
     def update_port(self, context, port_obj):
         """Update a port.
 
@@ -1734,6 +1737,9 @@ class ConductorManager(periodic_task.PeriodicTasks):
                  failed.
         :raises: MACAlreadyExists if the update is setting a MAC which is
                  registered on another port already.
+        :raises: InvalidStateRequested if port connectivity attributes
+                 are updated while not in a MANAGEABLE or ENROLL or
+                 INSPECTING state.
         """
         port_uuid = port_obj.uuid
         LOG.debug("RPC update_port called for port %s.", port_uuid)
@@ -1741,6 +1747,30 @@ class ConductorManager(periodic_task.PeriodicTasks):
         with task_manager.acquire(context, port_obj.node_id,
                                   purpose='port update') as task:
             node = task.node
+
+            # If port update is modifying the portgroup membership of the port
+            # or modifying the local_link_connection or pxe_enabled flags then
+            # check if the node is not in a MANAGEABLE or INSPECTING or ENROLL
+            # state
+            connectivity_attr = {'portgroup_uuid',
+                                 'pxe_enabled',
+                                 'local_link_connection'}
+            if set(port_obj.obj_what_changed()) & connectivity_attr and \
+               task.node.provision_state not in [states.ENROLL,
+                                                 states.INSPECTING,
+                                                 states.MANAGEABLE]:
+                action = _("Port %(port)s can not have any connectivity "
+                           "attributes such as portgroup_uuid, "
+                           "local_link_connection or pxe_enabled updated "
+                           "unless node %(node)s is in "
+                           "a MANAGEABLE or ENROLL or INSPECTING state. ")
+
+                raise exception.InvalidStateRequested(
+                    {'action': action % {'port': port_uuid,
+                                         'node': task.node.uuid},
+                     'node': task.node.uuid,
+                     'state': task.node.provision_state})
+
             if 'address' in port_obj.obj_what_changed():
                 vif = port_obj.extra.get('vif_port_id')
                 if vif:
@@ -1781,17 +1811,17 @@ class ConductorManager(periodic_task.PeriodicTasks):
                 vif = portgroup_obj.extra.get('vif_portgroup_id')
                 if vif:
                     api = dhcp_factory.DHCPFactory()
-                    api.provider.update_portgroup_address(
+                    api.provider.update_port_address(
                         vif,
                         portgroup_obj.address,
                         token=context.auth_token)
-                # Log warning if there is no vif_port_id and an instance
+                # Log warning if there is no vif_portgroup_id and an instance
                 # is associated with the node.
                 elif node.instance_uuid:
                     LOG.warning(_LW(
                         "No VIF found for instance %(instance)s "
                         "portgroup %(portgroup)s when attempting to update"
-                        " port MAC address."),
+                        " portgroup MAC address."),
                         {'portgroup': portgroup_uuid,
                          'instance': node.instance_uuid})
 

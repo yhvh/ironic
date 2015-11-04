@@ -2865,6 +2865,44 @@ class UpdatePortTestCase(_ServiceSetUpMixin, tests_db_base.DbTestCase):
 
 
 @_mock_record_keepalive
+class UpdatePortgroupTestCase(_ServiceSetUpMixin, tests_db_base.DbTestCase):
+    def test_update_portgroup(self):
+        node = obj_utils.create_test_node(self.context, driver='fake')
+        portgroup = obj_utils.create_test_portgroup(self.context,
+                                                    node_id=node.id)
+        new_extra = {'foo': 'baz'}
+        portgroup.extra = new_extra
+        res = self.service.update_portgroup(self.context, portgroup)
+        self.assertEqual(new_extra, res.extra)
+
+    @mock.patch('ironic.dhcp.neutron.NeutronDHCPApi.update_port_address')
+    def test_update_portgroup_vif(self, mac_update_mock):
+        node = obj_utils.create_test_node(self.context, driver='fake')
+        extra = {'vif_portgroup_id': 'fake-id'}
+        portgroup = obj_utils.create_test_portgroup(self.context,
+                                                    node_id=node.id,
+                                                    extra=extra)
+        new_address = '11:22:33:44:55:bb'
+        portgroup.address = new_address
+        res = self.service.update_portgroup(self.context, portgroup)
+        self.assertEqual(new_address, res.address)
+        mac_update_mock.assert_called_once_with('fake-id', new_address,
+                                                token=self.context.auth_token)
+
+    @mock.patch('ironic.dhcp.neutron.NeutronDHCPApi.update_port_address')
+    def test_update_portgroup_address_no_vif_id(self, mac_update_mock):
+        node = obj_utils.create_test_node(self.context, driver='fake',
+                                          instance_uuid='fake-uuid')
+        portgroup = obj_utils.create_test_port(self.context, node_id=node.id)
+
+        new_address = '11:22:33:44:55:bb'
+        portgroup.address = new_address
+        res = self.service.update_portgroup(self.context, portgroup)
+        self.assertEqual(new_address, res.address)
+        self.assertFalse(mac_update_mock.called)
+
+
+@_mock_record_keepalive
 class RaidTestCases(_ServiceSetUpMixin, tests_db_base.DbTestCase):
 
     def setUp(self):
@@ -4369,6 +4407,29 @@ class DestroyPortTestCase(_ServiceSetUpMixin, tests_db_base.DbTestCase):
         exc = self.assertRaises(messaging.rpc.ExpectedException,
                                 self.service.destroy_port,
                                 self.context, port)
+        # Compare true exception hidden by @messaging.expected_exceptions
+        self.assertEqual(exception.NodeLocked, exc.exc_info[0])
+
+
+@_mock_record_keepalive
+class DestroyPortgroupTestCase(_ServiceSetUpMixin, tests_db_base.DbTestCase):
+    def test_destroy_portgroup(self):
+        node = obj_utils.create_test_node(self.context, driver='fake')
+
+        portgroup = obj_utils.create_test_portgroup(self.context,
+                                                    node_id=node.id)
+        self.service.destroy_portgroup(self.context, portgroup)
+        self.assertRaises(exception.PortgroupNotFound, portgroup.refresh)
+
+    def test_destroy_portgroup_node_locked(self):
+        node = obj_utils.create_test_node(self.context, driver='fake',
+                                          reservation='fake-reserv')
+
+        portgroup = obj_utils.create_test_portgroup(self.context,
+                                                    node_id=node.id)
+        exc = self.assertRaises(messaging.rpc.ExpectedException,
+                                self.service.destroy_portgroup,
+                                self.context, portgroup)
         # Compare true exception hidden by @messaging.expected_exceptions
         self.assertEqual(exception.NodeLocked, exc.exc_info[0])
 

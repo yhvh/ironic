@@ -30,7 +30,6 @@ from ironic.api.controllers.v1 import utils as api_utils
 from ironic.api import expose
 from ironic.common import exception
 from ironic.common.i18n import _
-from ironic.common import states as ir_states
 from ironic import objects
 
 
@@ -448,32 +447,6 @@ class PortsController(rest.RestController):
             port = Port(**api_utils.apply_jsonpatch(port_dict, patch))
         except api_utils.JSONPATCH_EXCEPTIONS as e:
             raise exception.PatchError(patch=patch, reason=e)
-
-        # If port update is modifying the portgroup membership of the port
-        # or modifying the local_link_connection or pxe_enabled flags then
-        # check if the node is not in a MANAGEABLE or INSPECTING or ENROLL
-        # state return a 409 response.
-        patch_port_connectivity_attributes = False
-        for p in patch:
-            if (p['path'] == '/portgroup_uuid' or
-                    p['path'] == '/pxe_enabled' or
-                    p['path'] == '/local_link_connection'):
-                patch_port_connectivity_attributes = True
-        if patch_port_connectivity_attributes:
-            rpc_node = objects.Node.get_by_id(pecan.request.context,
-                                              rpc_port.node_id)
-            if (rpc_node.provision_state not in [ir_states.ENROLL,
-                                                 ir_states.INSPECTING,
-                                                 ir_states.MANAGEABLE]):
-                msg = _("Port %(port)s can not have any connectivity "
-                        "attributes such as portgroup_uuid, "
-                        "local_link_connection or pxe_enabled updated "
-                        "unless node %(node)s is in "
-                        "a MANAGEABLE or ENROLL or INSPECTING state. ")
-                raise wsme.exc.ClientSideError(msg %
-                                               {'port': port_uuid,
-                                                'node': rpc_node.uuid},
-                                               status_code=409)
 
         # Update only the fields that have changed
         for field in objects.Port.fields:
