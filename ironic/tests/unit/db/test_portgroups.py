@@ -132,6 +132,22 @@ class DbportgroupTestCase(base.DbTestCase):
         self.assertEqual(new_address, res.address)
         self.assertEqual(new_name, res.name)
 
+    def test_update_portgroup_by_uuid(self):
+        old_address = self.portgroup.address
+        new_address = 'ff:ee:dd:cc:bb:aa'
+        self.assertNotEqual(old_address, new_address)
+        res = self.dbapi.update_portgroup(self.portgroup.uuid,
+                                          {'address': new_address})
+        self.assertEqual(new_address, res.address)
+
+    def test_update_portgroup_by_mac(self):
+        old_name = self.portgroup.name
+        new_name = 'newname'
+        self.assertNotEqual(old_name, new_name)
+        res = self.dbapi.update_portgroup(self.portgroup.address,
+                                          {'name': new_name})
+        self.assertEqual(new_name, res.name)
+
     def test_update_portgroup_uuid(self):
         self.assertRaises(exception.InvalidParameterValue,
                           self.dbapi.update_portgroup, self.portgroup.id,
