@@ -279,7 +279,24 @@ class Connection(object):
     def create_port(self, values):
         """Create a new port.
 
-        :param values: Dict of values.
+        :param values: A dict of values describing the port. For example:
+
+                       ::
+
+                        {
+                         'address': 'fe:54:00:77:07:d9',
+                         'node_uuid': uuidutils.generate_uuid(),
+                         'uuid': uuidutils.generate_uuid(),
+                         'local_link_connection': {
+                             'switch_id': '0a:1b:2c:3d:4e:5f',
+                             'port_id': 'Ethernet3/1',
+                             'switch_info': 'switch1',
+                         },
+                         'portgroup_uuid': uuidutils.generate_uuid(),
+                         'pxe_enabled': true
+                         'extra': { ... },
+                        }
+        :returns: A port.
         """
 
     @abc.abstractmethod
@@ -335,7 +352,7 @@ class Connection(object):
                            sort_key=None, sort_dir=None):
         """Return a list of portgroups.
 
-        :param limit: Maximum number of ports to return.
+        :param limit: Maximum number of portgroups to return.
         :param marker: the last item of the previous page; we return the next
                        result set.
         :param sort_key: Attribute by which results should be sorted.
@@ -350,7 +367,7 @@ class Connection(object):
         """List all the portgroups for a given node.
 
         :param node_id: The integer node ID.
-        :param limit: Maximum number of ports to return.
+        :param limit: Maximum number of portgroups to return.
         :param marker: the last item of the previous page; we return the next
                        result set.
         :param sort_key: Attribute by which results should be sorted
@@ -363,23 +380,43 @@ class Connection(object):
     def create_portgroup(self, values):
         """Create a new portgroup.
 
-        :param values: Dict of values.
+        :param values: A dict of values describing the portgroup. For example:
+
+                       ::
+
+                        {
+                         'uuid': uuidutils.generate_uuid(),
+                         'name': 'fooname',
+                         'node_id': 1,
+                         'address': 'aa:bb:cc:11:22:33',
+                         'extra': { ... },
+                        }
+        :returns: A portgroup.
         """
 
     @abc.abstractmethod
     def update_portgroup(self, portgroup_id, values):
-        """Update properties of an portgroup.
+        """Update properties of a portgroup.
 
-        :param portgroup_id: The id or MAC of a portgroup.
-        :param values: Dict of values to update.
+        :param portgroup_uuid: The id or uuid of a portgroup.
+        :param values: A dict of values to update. For example:
+
+                       ::
+
+                        {
+                         'name': 'fooname',
+                         'node_id': 1,
+                         'address': 'aa:bb:cc:11:22:33',
+                         'extra': { ... },
+                        }
         :returns: A portgroup.
         """
 
     @abc.abstractmethod
     def destroy_portgroup(self, portgroup_id):
-        """Destroy an portgroup.
+        """Destroy a portgroup.
 
-        :param portgroup_id: The id or MAC of a portgroup.
+        :param portgroup_id: The id or uuid of the portgroup.
         """
 
     @abc.abstractmethod

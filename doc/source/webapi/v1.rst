@@ -236,3 +236,16 @@ Ports
 
 .. autotype:: ironic.api.controllers.v1.port.Port
    :members:
+
+Portgroups
+=====
+
+.. rest-controller:: ironic.api.controllers.v1.portgroup:PortgroupsController
+   :webprefix: /v1/portgroups
+
+.. autotype:: ironic.api.controllers.v1.portgroup.PortgroupCollection
+   :members:
+
+.. autotype:: ironic.api.controllers.v1.portgroup.Portgroup
+   :members:
+
