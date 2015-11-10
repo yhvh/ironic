@@ -341,6 +341,13 @@ class GenericUtilsTestCase(base.TestCase):
         self.assertFalse(utils.is_valid_mac("AA BB CC DD EE FF"))
         self.assertFalse(utils.is_valid_mac("AA-BB-CC-DD-EE-FF"))
 
+    def test_is_valid_datapath_id(self):
+        self.assertTrue(utils.is_valid_datapath_id("525400cf2d319fdf"))
+        self.assertTrue(utils.is_valid_datapath_id("525400CF2D319FDF"))
+        self.assertFalse(utils.is_valid_datapath_id("52"))
+        self.assertFalse(utils.is_valid_datapath_id("52:54:00:cf:2d:31"))
+        self.assertFalse(utils.is_valid_datapath_id("notadatapathid00"))
+
     def test_is_hostname_safe(self):
         self.assertTrue(utils.is_hostname_safe('spam'))
         self.assertFalse(utils.is_hostname_safe('spAm'))

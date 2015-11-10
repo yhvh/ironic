@@ -271,22 +271,41 @@ class JsonPatchType(wtypes.Base):
         return ret
 
 
-class LocalLinkConnectionType(JsonType):
+class LocalLinkConnectionType(wtypes.UserType):
     """A type describing local link connection"""
+
+    basetype = wtypes.DictType
+    name = 'locallinkconnection'
+    # FIXME(lucasagomes): When used with wsexpose decorator WSME will try
+    # to get the name of the type by accessing it's __name__ attribute.
+    # Remove this __name__ attribute once it's fixed in WSME.
+    # https://bugs.launchpad.net/wsme/+bug/1265590
+    __name__ = name
 
     valid_fields = {'switch_id',
                     'port_id',
                     'switch_info'}
-
     mandatory_fields = {'switch_id',
                         'port_id'}
 
-    name = 'locallinkconnection'
-    __name__ = name
-
     @staticmethod
     def validate(value):
-        JsonType.validate(value)
+        """Validate and convert the input to a LocalLinkConnectionType.
+
+        :param value: A dictionary, switch_id is a MAC address or an
+        OpenFlow based datapath_id, switch_info is an optional field.
+
+        For example::
+        {
+            'switch_id': mac_or_datapath_id(),
+            'port_id': 'Ethernet3/1',
+            'switch_info': 'switch1'
+        }
+
+        :returns: A dictionary
+
+        """
+        wtypes.DictType(wtypes.text, wtypes.text).validate(value)
 
         keys = set(value.keys())
         invalid = keys - LocalLinkConnectionType.valid_fields
@@ -299,9 +318,17 @@ class LocalLinkConnectionType(JsonType):
                 msg = _('Missing mandatory keys: %s') % (missing)
                 raise exception.Invalid(msg)
 
-            # Check the switch_id is a valid mac address
-            MacAddressType.validate(value['switch_id'])
+            # Check switch_id is either a valid mac address or
+            # OpenFlow datapath_id
+            if not (utils.is_valid_mac(value['switch_id']) or
+                    utils.is_valid_datapath_id(value['switch_id'])):
+                raise exception.InvalidSwitchID(switch_id=value['switch_id'])
         return value
 
+    @staticmethod
+    def frombasetype(value):
+        if value is None:
+            return None
+        return LocalLinkConnectionType.validate(value)
 
 locallinkconnectiontype = LocalLinkConnectionType()

@@ -185,6 +185,21 @@ def is_valid_mac(address):
             re.match(m, address.lower()))
 
 
+def is_valid_datapath_id(datapath_id):
+    """Verify the format of a OpenFlow datapath_id
+
+    Check if a datapath_id is valid and contains 16 hexadecimal
+    digits.
+
+    :param datapath_id: OpenFlow datapath_id to be validated.
+    :returns: True if valid. False if not.
+
+    """
+    m = "[0-9a-f]{16}$"
+    return (isinstance(datapath_id, six.string_types) and
+            re.match(m, datapath_id.lower()))
+
+
 _is_valid_logical_name_re = re.compile(r'^[A-Z0-9-._~]+$', re.I)
 
 # old is_hostname_safe() regex, retained for backwards compat

@@ -283,10 +283,23 @@ class TestListType(base.TestCase):
 class TestLocalLinkConnectionType(base.TestCase):
 
     def test_local_link_connection_type(self):
-        v = types.LocalLinkConnectionType()
-        self.assertItemsEqual({'switch_id': '0a:1b:2c:3d:4e:5f',
-                               'port_id': 'value2',
-                               'switch_info': 'value3'},
-                              v.validate({'switch_id': '0a:1b:2c:3d:4e:5f',
-                                          'port_id': 'value2',
-                                          'switch_info': 'value3'}))
+        v = types.locallinkconnectiontype
+        value = {'switch_id': '0a:1b:2c:3d:4e:5f',
+                 'port_id': 'value2',
+                 'switch_info': 'value3'}
+        self.assertItemsEqual(value, v.validate(value))
+
+    def test_local_link_connection_type_datapath_id(self):
+        v = types.locallinkconnectiontype
+        value = {'switch_id': '0000000000000000',
+                 'port_id': 'value2',
+                 'switch_info': 'value3'}
+        self.assertItemsEqual(value,
+                              v.validate(value))
+
+    def test_local_link_connection_type_not_mac_or_datapath_id(self):
+        v = types.locallinkconnectiontype
+        value = {'switch_id': 'badid',
+                 'port_id': 'value2',
+                 'switch_info': 'value3'}
+        self.assertRaises(exception.InvalidSwitchID, v.validate, value)
